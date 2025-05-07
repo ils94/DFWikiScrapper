@@ -2,6 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import json
+from datetime import datetime
+import uuid
 
 # List of URLs to scrape
 urls = [
@@ -20,10 +22,10 @@ urls = [
 # Generalized regex patterns for different weapon types
 patterns = {
     'DPS': re.compile(
-        r'(?:Avg\. Damage per Second|Average Damage per Second):\s*.*?<b>([\d.]+)\s*\(([\d.]+)\)</b>.*?Theoretical: <b>([\d.]+)\s*\(([\d.]+)\)</b>',
+        r'(?:Avg\. Damage per Second|Average Damage per Second):\s*.*?<b>([\d.]+)(?:\s*\(([\d.]+)\))?\s*</b>.*?Theoretical: <b>([\d.]+)(?:\s*\(([\d.]+)\))?\s*</b>',
         re.DOTALL),
     'Damage per Hit': re.compile(
-        r'(?:Damage per Hit|Damage per Shot|Explosion Damage):.*?<b>([\d.]+)\s*(?:\(([\d.]+)\))?</b>',
+        r'(?:Damage per Hit|Damage per Shot|Explosion Damage):.*?<b>(?:[\d.]+ x \d+ = )?([\d.]+)(?:\s*\(([\d.]+)\))?</b>',
         re.DOTALL),
     'HPS': re.compile(
         r'(?:Hit\(s\) per Second|Shot\(s\) per Second):.*?<b>([\d.]+)</b>.*?Theoretical: <b>([\d.]+)</b>',
@@ -38,11 +40,9 @@ patterns = {
     'Accuracy': re.compile(r'Accuracy:.*?<b>([\d.]+)%</b>', re.DOTALL)
 }
 
-
 # Clean weapon name
 def clean_weapon_name(name):
     return re.sub(r'\((Craft|Dusk|Challenge|LE)\)[^\n]*', '', name, flags=re.IGNORECASE).strip()
-
 
 # Scrape data from a single URL
 def scrape_weapon_data(url, category):
@@ -76,7 +76,6 @@ def scrape_weapon_data(url, category):
         i += 1
     return weapons_data
 
-
 # Main scraping logic
 all_weapons = {}
 for url in urls:
@@ -101,8 +100,8 @@ for name, data in all_weapons.items():
             weapon_entry['stats']['DPS'] = {
                 "real": stat_values[0],
                 "theoretical": stat_values[2],
-                "critical": stat_values[1],
-                "theoretical_critical": stat_values[3]
+                "critical": stat_values[1] if stat_values[1] else None,
+                "theoretical_critical": stat_values[3] if stat_values[3] else None
             }
         elif stat_name == 'Damage per Hit' and stat_values:
             weapon_entry['stats']['DPH'] = {
@@ -129,3 +128,38 @@ with open('dead_frontier_weapons.json', 'w', encoding='utf-8') as f:
     json.dump(json_data, f, indent=4, ensure_ascii=False)
 
 print("Data scraped and saved to 'dead_frontier_weapons.json'.")
+
+# Generate TamperMonkey script
+tampermonkey_template = f"""// ==UserScript==
+// @name         Dead Frontier Weapon Data
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Provides weapon data for Dead Frontier Tooltip DPS Injector
+// @author       ils94
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=24
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=25
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=28*
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=35
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=50
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=59
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=82*
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=84
+// @license      MIT
+// @grant        none
+// @run-at       document-start
+// @downloadURL https://update.greasyfork.org/scripts/535178/Dead%20Frontier%20Weapon%20Data.user.js
+// @updateURL https://update.greasyfork.org/scripts/535178/Dead%20Frontier%20Weapon%20Data.meta.js
+// ==/UserScript==
+
+(function() {{
+    'use strict';
+
+    window.weaponData = {json.dumps(json_data, indent=4, ensure_ascii=False)};
+}})();
+"""
+
+# Save TamperMonkey script
+with open('dead_frontier_weapons.user.js', 'w', encoding='utf-8') as f:
+    f.write(tampermonkey_template)
+
+print("TamperMonkey script generated and saved to 'dead_frontier_weapons.user.js'.")
