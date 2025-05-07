@@ -2,8 +2,6 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import json
-from datetime import datetime
-import uuid
 
 # List of URLs to scrape
 urls = [
@@ -25,7 +23,7 @@ patterns = {
         r'(?:Avg\. Damage per Second|Average Damage per Second):\s*.*?<b>([\d.]+)(?:\s*\(([\d.]+)\))?\s*</b>.*?Theoretical: <b>([\d.]+)(?:\s*\(([\d.]+)\))?\s*</b>',
         re.DOTALL),
     'Damage per Hit': re.compile(
-        r'(?:Damage per Hit|Damage per Shot|Explosion Damage):.*?<b>(?:[\d.]+ x \d+ = )?([\d.]+)(?:\s*\(([\d.]+)\))?</b>',
+        r'(?:Damage per Hit|Damage per Shot|Explosion Damage):.*?<b>(?:(?:(\d+\.?\d*)\s*x\s*(\d+)\s*=\s*(\d+\.?\d*))|(\d+\.?\d*))(?:\s*\((\d+\.?\d*)\))?</b>',
         re.DOTALL),
     'HPS': re.compile(
         r'(?:Hit\(s\) per Second|Shot\(s\) per Second):.*?<b>([\d.]+)</b>.*?Theoretical: <b>([\d.]+)</b>',
@@ -79,7 +77,6 @@ def scrape_weapon_data(url, category):
 # Main scraping logic
 all_weapons = {}
 for url in urls:
-    # Extract category from URL
     category = url.split('/')[-1].replace('_', ' ')
     print(f"Scraping {category}...")
     weapons = scrape_weapon_data(url, category)
@@ -104,10 +101,20 @@ for name, data in all_weapons.items():
                 "theoretical_critical": stat_values[3] if stat_values[3] else None
             }
         elif stat_name == 'Damage per Hit' and stat_values:
-            weapon_entry['stats']['DPH'] = {
-                "real": stat_values[0],
-                "critical": stat_values[1] if stat_values[1] else None
-            }
+            if stat_values[0]:  # Multiplier format (base, multiplier, total)
+                weapon_entry['stats']['DPH'] = {
+                    "base": stat_values[0],
+                    "multiplier": stat_values[1],
+                    "total": stat_values[2],
+                    "critical": stat_values[4] if stat_values[4] else None
+                }
+            else:  # Simple format (single value)
+                weapon_entry['stats']['DPH'] = {
+                    "base": None,
+                    "multiplier": None,
+                    "total": stat_values[3],
+                    "critical": stat_values[4] if stat_values[4] else None
+                }
         elif stat_name == 'HPS' and stat_values:
             weapon_entry['stats']['HPS'] = {
                 "real": stat_values[0],
