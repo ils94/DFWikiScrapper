@@ -81,7 +81,7 @@ def scrape_weapon_data(url, category):
 # Main scraping logic (unchanged)
 all_weapons = {}
 for url in urls:
-    category = url.split('/')[-1].replace('_', ' ')
+    category = url.split('/')[-1].replace('_', ' ').replace(', Armour %26 Clothings', '')
     print(f"Scraping {category}...")
     weapons = scrape_weapon_data(url, category)
     all_weapons.update(weapons)
