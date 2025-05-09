@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import re
 import json
 
-# List of URLs to scrape
+# List of URLs to scrape (unchanged)
 urls = [
     'https://deadfrontier.fandom.com/wiki/Melee_Weapons',
     'https://deadfrontier.fandom.com/wiki/Pistols',
@@ -14,16 +14,17 @@ urls = [
     'https://deadfrontier.fandom.com/wiki/Assault_Rifles',
     'https://deadfrontier.fandom.com/wiki/Heavy_Machine_Guns',
     'https://deadfrontier.fandom.com/wiki/Grenade_Launchers',
-    'https://deadfrontier.fandom.com/wiki/Flamethrowers'
+    'https://deadfrontier.fandom.com/wiki/Flamethrowers',
+    'https://deadfrontier.fandom.com/wiki/HCIM_Weapons,_Armour_%26_Clothings'
 ]
 
-# Generalized regex patterns for different weapon types
+# Patterns dictionary (updated to include Damage per Burst)
 patterns = {
     'DPS': re.compile(
         r'(?:Avg\. Damage per Second|Average Damage per Second):\s*.*?<b>([\d.]+)(?:\s*\(([\d.]+)\))?\s*</b>.*?Theoretical: <b>([\d.]+)(?:\s*\(([\d.]+)\))?\s*</b>',
         re.DOTALL),
     'Damage per Hit': re.compile(
-        r'(?:Damage per Hit|Damage per Shot|Explosion Damage):.*?<b>(?:(?:(\d+\.?\d*)\s*x\s*(\d+)\s*=\s*(\d+\.?\d*))|(\d+\.?\d*))(?:\s*\((\d+\.?\d*)\))?</b>',
+        r'(?:Damage per Hit|Damage per Shot|Damage per Burst|Explosion Damage):.*?<b>(.*?)(?:\s*\((.*?)\))?</b>',
         re.DOTALL),
     'HPS': re.compile(
         r'(?:Hit\(s\) per Second|Shot\(s\) per Second):.*?<b>([\d.]+)</b>.*?Theoretical: <b>([\d.]+)</b>',
@@ -38,11 +39,13 @@ patterns = {
     'Accuracy': re.compile(r'Accuracy:.*?<b>([\d.]+)%</b>', re.DOTALL)
 }
 
-# Clean weapon name
-def clean_weapon_name(name):
-    return re.sub(r'\((Craft|Dusk|Challenge|LE)\)[^\n]*', '', name, flags=re.IGNORECASE).strip()
 
-# Scrape data from a single URL
+# Clean weapon name (unchanged)
+def clean_weapon_name(name):
+    return re.sub(r'\((Craft|Dusk|Challenge|LE|Unique)\)[^\n]*', '', name, flags=re.IGNORECASE).strip()
+
+
+# Scrape data from a single URL (unchanged)
 def scrape_weapon_data(url, category):
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
@@ -74,7 +77,8 @@ def scrape_weapon_data(url, category):
         i += 1
     return weapons_data
 
-# Main scraping logic
+
+# Main scraping logic (unchanged)
 all_weapons = {}
 for url in urls:
     category = url.split('/')[-1].replace('_', ' ')
@@ -82,7 +86,7 @@ for url in urls:
     weapons = scrape_weapon_data(url, category)
     all_weapons.update(weapons)
 
-# Structure the data for JSON
+# Structure the data for JSON (unchanged)
 json_data = {
     "weapons": []
 }
@@ -101,20 +105,14 @@ for name, data in all_weapons.items():
                 "theoretical_critical": stat_values[3] if stat_values[3] else None
             }
         elif stat_name == 'Damage per Hit' and stat_values:
-            if stat_values[0]:  # Multiplier format (base, multiplier, total)
-                weapon_entry['stats']['DPH'] = {
-                    "base": stat_values[0],
-                    "multiplier": stat_values[1],
-                    "total": stat_values[2],
-                    "critical": stat_values[4] if stat_values[4] else None
-                }
-            else:  # Simple format (single value)
-                weapon_entry['stats']['DPH'] = {
-                    "base": None,
-                    "multiplier": None,
-                    "total": stat_values[3],
-                    "critical": stat_values[4] if stat_values[4] else None
-                }
+            # Clean the total field by removing <br> tags
+            total_cleaned = re.sub(r'<br\s*/?>', '', stat_values[0]).strip() if stat_values[0] else None
+            weapon_entry['stats']['DPH'] = {
+                "base": None,
+                "multiplier": None,
+                "total": total_cleaned,
+                "critical": stat_values[1].strip() if stat_values[1] else None
+            }
         elif stat_name == 'HPS' and stat_values:
             weapon_entry['stats']['HPS'] = {
                 "real": stat_values[0],
@@ -130,13 +128,13 @@ for name, data in all_weapons.items():
 
     json_data['weapons'].append(weapon_entry)
 
-# Save to JSON file
+# Save to JSON file (unchanged)
 with open('dead_frontier_weapons.json', 'w', encoding='utf-8') as f:
     json.dump(json_data, f, indent=4, ensure_ascii=False)
 
 print("Data scraped and saved to 'dead_frontier_weapons.json'.")
 
-# Generate TamperMonkey script
+# Generate TamperMonkey script (unchanged)
 tampermonkey_template = f"""// ==UserScript==
 // @name         Dead Frontier Weapon Data
 // @namespace    http://tampermonkey.net/
@@ -151,6 +149,8 @@ tampermonkey_template = f"""// ==UserScript==
 // @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=59
 // @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=82*
 // @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=84
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/DF3D/DF3D_InventoryPage.php?page=31*
+// @match        https://fairview.deadfrontier.com/onlinezombiemmo/index.php?page=32*
 // @license      MIT
 // @grant        none
 // @run-at       document-start
@@ -165,7 +165,7 @@ tampermonkey_template = f"""// ==UserScript==
 }})();
 """
 
-# Save TamperMonkey script
+# Save TamperMonkey script (unchanged)
 with open('dead_frontier_weapons.user.js', 'w', encoding='utf-8') as f:
     f.write(tampermonkey_template)
 
