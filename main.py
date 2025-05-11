@@ -42,7 +42,11 @@ patterns = {
 
 # Clean weapon name (unchanged)
 def clean_weapon_name(name):
-    return re.sub(r'\((Craft|Dusk|Challenge|LE|Unique)\)[^\n]*', '', name, flags=re.IGNORECASE).strip()
+    # Remove tags like (Craft), (Dusk), etc.
+    name = re.sub(r'\((Craft|Dusk|Challenge|LE|Unique)\)[^\n]*', '', name, flags=re.IGNORECASE)
+    # Remove special characters, spaces, and convert to lowercase
+    name = re.sub(r'[^a-zA-Z0-9]', '', name).lower()
+    return name.strip()
 
 
 # Scrape data from a single URL (unchanged)
@@ -108,8 +112,6 @@ for name, data in all_weapons.items():
             # Clean the total field by removing <br> tags
             total_cleaned = re.sub(r'<br\s*/?>', '', stat_values[0]).strip() if stat_values[0] else None
             weapon_entry['stats']['DPH'] = {
-                "base": None,
-                "multiplier": None,
                 "total": total_cleaned,
                 "critical": stat_values[1].strip() if stat_values[1] else None
             }
