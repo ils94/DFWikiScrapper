@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import json
+import os
 
 # List of URLs to scrape (unchanged)
 urls = [
@@ -90,51 +91,74 @@ for url in urls:
     weapons = scrape_weapon_data(url, category)
     all_weapons.update(weapons)
 
-# Structure the data for JSON (unchanged)
-json_data = {
-    "weapons": []
-}
-for name, data in all_weapons.items():
-    weapon_entry = {
-        "name": name,
-        "category": data['category'],
-        "stats": {}
-    }
-    for stat_name, stat_values in data['stats'].items():
-        if stat_name == 'DPS' and stat_values:
-            weapon_entry['stats']['DPS'] = {
-                "real": stat_values[0],
-                "theoretical": stat_values[2],
-                "critical": stat_values[1] if stat_values[1] else None,
-                "theoretical_critical": stat_values[3] if stat_values[3] else None
-            }
-        elif stat_name == 'Damage per Hit' and stat_values:
-            # Clean the total field by removing <br> tags
-            total_cleaned = re.sub(r'<br\s*/?>', '', stat_values[0]).strip() if stat_values[0] else None
-            weapon_entry['stats']['DPH'] = {
-                "total": total_cleaned,
-                "critical": stat_values[1].strip() if stat_values[1] else None
-            }
-        elif stat_name == 'HPS' and stat_values:
-            weapon_entry['stats']['HPS'] = {
-                "real": stat_values[0],
-                "theoretical": stat_values[1]
-            }
-        elif stat_name == 'Melee Range' and stat_values:
-            weapon_entry['stats']['Melee Range'] = {
-                "range": stat_values[0],
-                "cleave_width": stat_values[1]
-            }
-        elif stat_name in ['Magazine Size', 'Reload Time', 'Critical Chance', 'Knockback', 'Accuracy'] and stat_values:
-            weapon_entry['stats'][stat_name] = stat_values[0]
+# Load existing JSON if it exists, otherwise initialize
+json_file = 'dead_frontier_weapons.json'
+if os.path.exists(json_file):
+    print(f"Loading existing data from {json_file}...")
+    with open(json_file, 'r', encoding='utf-8') as f:
+        json_data = json.load(f)
+    existing_names = {weapon['name'] for weapon in json_data['weapons']}
+    print(f"Found {len(existing_names)} existing weapons.")
+else:
+    json_data = {"weapons": []}
+    existing_names = set()
+    print("No existing JSON found. Creating new one.")
 
-    json_data['weapons'].append(weapon_entry)
+# Add only new weapons from the scrape
+new_weapons = []
+new_count = 0
+for name, data in all_weapons.items():
+    if name not in existing_names:
+        weapon_entry = {
+            "name": name,
+            "category": data['category'],
+            "stats": {}
+        }
+        for stat_name, stat_values in data['stats'].items():
+            if stat_name == 'DPS' and stat_values:
+                weapon_entry['stats']['DPS'] = {
+                    "real": stat_values[0],
+                    "theoretical": stat_values[2],
+                    "critical": stat_values[1] if stat_values[1] else None,
+                    "theoretical_critical": stat_values[3] if stat_values[3] else None
+                }
+            elif stat_name == 'Damage per Hit' and stat_values:
+                # Clean the total field by removing <br> tags
+                total_cleaned = re.sub(r'<br\s*/?>', '', stat_values[0]).strip() if stat_values[0] else None
+                weapon_entry['stats']['DPH'] = {
+                    "total": total_cleaned,
+                    "critical": stat_values[1].strip() if stat_values[1] else None
+                }
+            elif stat_name == 'HPS' and stat_values:
+                weapon_entry['stats']['HPS'] = {
+                    "real": stat_values[0],
+                    "theoretical": stat_values[1]
+                }
+            elif stat_name == 'Melee Range' and stat_values:
+                weapon_entry['stats']['Melee Range'] = {
+                    "range": stat_values[0],
+                    "cleave_width": stat_values[1]
+                }
+            elif stat_name in ['Magazine Size', 'Reload Time', 'Critical Chance', 'Knockback',
+                               'Accuracy'] and stat_values:
+                weapon_entry['stats'][stat_name] = stat_values[0]
+
+        json_data['weapons'].append(weapon_entry)
+        new_weapons.append(name)
+        new_count += 1
+
+if new_count > 0:
+    print(f"Added {new_count} new weapons:")
+    for w in new_weapons:
+        print(f"  - {w}")
+else:
+    print("No new weapons found.")
 
 # Save to JSON file (unchanged)
 with open('dead_frontier_weapons.json', 'w', encoding='utf-8') as f:
     json.dump(json_data, f, indent=4, ensure_ascii=False)
 
-print("Data scraped and saved to 'dead_frontier_weapons.json'.")
+print("Data updated and saved to 'dead_frontier_weapons.json'.")
 
 # Generate TamperMonkey script (unchanged)
 tampermonkey_template = f"""// ==UserScript==
